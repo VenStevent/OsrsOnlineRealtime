@@ -1,0 +1,8 @@
+{
+  "name": "osrs-player-history",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@upstash/redis": "latest"
+  }
+}
