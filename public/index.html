@@ -514,7 +514,24 @@ $('#refresh').onclick=load;
 
 load();
 
-setInterval(load,60000);
+function startMinuteAutoRefresh(){
+  const schedule = () => {
+    const now = new Date();
+    const msUntilNextMinute =
+      (60 - now.getSeconds()) * 1000 -
+      now.getMilliseconds() +
+      100;
+
+    setTimeout(async () => {
+      await load();
+      schedule();
+    }, Math.max(1000, msUntilNextMinute));
+  };
+
+  schedule();
+}
+
+startMinuteAutoRefresh();
 
 window.addEventListener('resize',load);
 </script>
