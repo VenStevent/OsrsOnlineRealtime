@@ -48,6 +48,17 @@ body{margin:0;background:#0d0e10}
 .chart{height:270px}
 .stats{grid-template-columns:repeat(2,1fr)}
 }
+
+.candle-up{
+  stroke: #22c55e;
+  fill: #22c55e;
+}
+
+.candle-down{
+  stroke: #ef4444;
+  fill: #ef4444;
+}
+
 </style>
 </head>
 
@@ -158,73 +169,144 @@ function draw(points){
     return;
   }
 
-  const w = box.clientWidth || 900;
-  const h = box.clientHeight || 340;
-  const pad = {l:8,r:78,t:20,b:28};
+  const now = Date.now();
+  const cutoff =
+    now - chartRangeMinutes * 60 * 1000;
 
-  const xs = points.map(p => p.t);
-  const ys = points.map(p => p.count);
-
-  const minX = xs[0];
-  const maxX = xs[xs.length-1] || minX + 1;
-
-  const dataMin = Math.min(...ys);
-  const dataMax = Math.max(...ys);
-
-  const padding = Math.max(
-    100,
-    Math.round((dataMax-dataMin)*0.12)
+  const source = points.filter(
+    p => p.t >= cutoff
   );
 
-  const minY = Math.floor((dataMin-padding)/100)*100;
-  const maxY = Math.ceil((dataMax+padding)/100)*100;
+  if(!source.length){
+    box.innerHTML = '<div class="empty">No data.</div>';
+    return;
+  }
 
-  const rangeX = Math.max(1,maxX-minX);
-  const rangeY = Math.max(1,maxY-minY);
+  /*
+   * 1 candle = 5 minutes
+   *
+   * Open  = first value
+   * High  = highest value
+   * Low   = lowest value
+   * Close = last value
+   */
+
+  const bucket = 5 * 60 * 1000;
+  const candles = [];
+
+  const groups = new Map();
+
+  source.forEach(p => {
+
+    const key =
+      Math.floor(p.t / bucket) * bucket;
+
+    if(!groups.has(key)){
+      groups.set(key, []);
+    }
+
+    groups.get(key).push(p);
+  });
+
+  for(const [time, values] of groups){
+
+    values.sort((a,b) => a.t-b.t);
+
+    const nums =
+      values.map(v => v.count);
+
+    candles.push({
+      t: time,
+      open: values[0].count,
+      high: Math.max(...nums),
+      low: Math.min(...nums),
+      close: values[values.length-1].count
+    });
+  }
+
+  candles.sort((a,b) => a.t-b.t);
+
+  const w = box.clientWidth || 900;
+  const h = box.clientHeight || 340;
+
+  const pad = {
+    l: 8,
+    r: 78,
+    t: 20,
+    b: 42
+  };
+
+  const dataMin =
+    Math.min(...candles.map(c => c.low));
+
+  const dataMax =
+    Math.max(...candles.map(c => c.high));
+
+  const dataRange =
+    Math.max(1, dataMax-dataMin);
+
+  const padding =
+    Math.max(100, Math.round(dataRange*0.12));
+
+  const minY =
+    Math.floor((dataMin-padding)/100)*100;
+
+  const maxY =
+    Math.ceil((dataMax+padding)/100)*100;
+
+  const minX = candles[0].t;
+  const maxX =
+    candles[candles.length-1].t + bucket;
+
+  const rangeX =
+    Math.max(1,maxX-minX);
+
+  const rangeY =
+    Math.max(1,maxY-minY);
 
   const X = t =>
-    pad.l + ((t-minX)/rangeX)*(w-pad.l-pad.r);
+    pad.l +
+    ((t-minX)/rangeX) *
+    (w-pad.l-pad.r);
 
   const Y = v =>
-    h-pad.b-((v-minY)/rangeY)*(h-pad.t-pad.b);
+    h-pad.b -
+    ((v-minY)/rangeY) *
+    (h-pad.t-pad.b);
 
-  const line = points.map((p,i) =>
-    (i ? 'L' : 'M') +
-    X(p.t).toFixed(1) + ' ' +
-    Y(p.count).toFixed(1)
-  ).join(' ');
+  /*
+   * Y axis
+   */
 
-  const area =
-    line +
-    ` L ${X(maxX).toFixed(1)} ${h-pad.b}` +
-    ` L ${X(minX).toFixed(1)} ${h-pad.b} Z`;
+  const rawStep = rangeY/5;
 
-  const rawStep = rangeY / 5;
   const magnitude =
-    Math.pow(10, Math.floor(Math.log10(rawStep)));
+    Math.pow(
+      10,
+      Math.floor(Math.log10(rawStep))
+    );
 
-  const normalized = rawStep / magnitude;
+  const normalized =
+    rawStep/magnitude;
 
   let step;
 
-  if(normalized <= 1) step = magnitude;
-  else if(normalized <= 2) step = 2*magnitude;
-  else if(normalized <= 5) step = 5*magnitude;
-  else step = 10*magnitude;
+  if(normalized <= 1)
+    step = magnitude;
+  else if(normalized <= 2)
+    step = 2*magnitude;
+  else if(normalized <= 5)
+    step = 5*magnitude;
+  else
+    step = 10*magnitude;
 
-  let ticks = [];
+  let grid = '';
 
   for(
     let v = Math.ceil(minY/step)*step;
     v <= maxY;
     v += step
   ){
-    ticks.push(v);
-  }
-
-  let grid = '';
-
-  ticks.forEach(v => {
 
     const y = Y(v);
 
@@ -244,31 +326,133 @@ function draw(points){
         ${fmt(v)}
       </text>
     `;
+  }
+
+  /*
+   * Timestamp 5 menit
+   */
+
+  let xLabels = '';
+
+  const firstTick =
+    Math.ceil(minX/bucket)*bucket;
+
+  for(
+    let t=firstTick;
+    t<=maxX;
+    t+=bucket
+  ){
+
+    const x = X(t);
+
+    if(
+      x < pad.l ||
+      x > w-pad.r
+    ){
+      continue;
+    }
+
+    const d = new Date(t);
+
+    const label =
+      String(d.getHours()).padStart(2,'0') +
+      ':' +
+      String(d.getMinutes()).padStart(2,'0');
+
+    xLabels += `
+      <line
+        class="axis"
+        x1="${x}"
+        y1="${h-pad.b}"
+        x2="${x}"
+        y2="${h-pad.b+5}"
+      />
+
+      <text
+        class="chart-label"
+        text-anchor="middle"
+        x="${x}"
+        y="${h-10}">
+        ${label}
+      </text>
+    `;
+  }
+
+  /*
+   * Candlestick
+   */
+
+  let candleSvg = '';
+
+  const candleWidth =
+    Math.max(
+      2,
+      Math.min(
+        14,
+        ((w-pad.l-pad.r) /
+        Math.max(1,candles.length))*0.65
+      )
+    );
+
+  candles.forEach(c => {
+
+    const x = X(c.t + bucket/2);
+
+    const openY = Y(c.open);
+    const closeY = Y(c.close);
+    const highY = Y(c.high);
+    const lowY = Y(c.low);
+
+    const bullish =
+      c.close >= c.open;
+
+    const cls =
+      bullish ? 'candle-up' : 'candle-down';
+
+    const top =
+      Math.min(openY,closeY);
+
+    const bodyHeight =
+      Math.max(
+        1,
+        Math.abs(closeY-openY)
+      );
+
+    candleSvg += `
+
+      <!-- wick -->
+
+      <line
+        class="${cls}"
+        x1="${x}"
+        y1="${highY}"
+        x2="${x}"
+        y2="${lowY}"
+      />
+
+      <!-- body -->
+
+      <rect
+        class="${cls}"
+        x="${x-candleWidth/2}"
+        y="${top}"
+        width="${candleWidth}"
+        height="${bodyHeight}"
+      />
+
+    `;
   });
 
   box.innerHTML = `
-    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-
-      <defs>
-        <linearGradient id="fade"
-          x1="0" y1="0"
-          x2="0" y2="1">
-          <stop offset="0" stop-opacity=".14"/>
-          <stop offset="1" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
+    <svg
+      viewBox="0 0 ${w} ${h}"
+      preserveAspectRatio="none">
 
       ${grid}
 
-      <path
-        class="area"
-        d="${area}"
-      />
+      ${xLabels}
 
-      <path
-        class="line"
-        d="${line}"
-      />
+      ${candleSvg}
 
     </svg>
   `;
