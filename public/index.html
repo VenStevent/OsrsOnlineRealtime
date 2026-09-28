@@ -526,20 +526,16 @@ function startStatusClock(){
 startStatusClock();
 
 function startMinuteAutoRefresh(){
-  const now = new Date();
-  const delay =
-    (60 - now.getSeconds()) * 1000 -
-    now.getMilliseconds() +
-    100;
+  let lastMinute = new Date().getMinutes();
 
-  setTimeout(()=>{
-    load();
+  setInterval(()=>{
+    const currentMinute = new Date().getMinutes();
 
-    setInterval(()=>{
+    if(currentMinute !== lastMinute){
+      lastMinute = currentMinute;
       load();
-    },60000);
-
-  },Math.max(1000,delay));
+    }
+  },1000);
 }
 
 startMinuteAutoRefresh();
