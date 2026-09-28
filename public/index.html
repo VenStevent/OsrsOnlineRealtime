@@ -161,7 +161,7 @@ function time(ts){
 }
 
 function timeAgo(ts){
-  const m=Math.max(0,Math.round((Date.now()-ts)/60000));
+  const m=Math.max(0,Math.floor((Date.now()-ts)/60000));
   return m<1?'just now':`${m}m ago`;
 }
 
@@ -456,9 +456,8 @@ async function load(){
 
     if(d.latest){
 
-      const latest=d.latest;
-
-      $('#count').textContent=fmt(latest.count);
+      window.__latestTimestamp=latest.t;
+$('#count').textContent=fmt(latest.count);
       $('#status').textContent=`Updated ${timeAgo(latest.t)}`;
 
       const values=points.map(p=>p.count);
@@ -513,6 +512,17 @@ document
 $('#refresh').onclick=load;
 
 load();
+
+function startStatusClock(){
+  setInterval(()=>{
+    const ts=window.__latestTimestamp;
+    if(ts){
+      $('#status').textContent=`Updated ${timeAgo(ts)}`;
+    }
+  },1000);
+}
+
+startStatusClock();
 
 function startMinuteAutoRefresh(){
   const schedule = () => {
