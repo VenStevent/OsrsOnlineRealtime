@@ -48,6 +48,38 @@ body{margin:0;background:#0d0e10}
 .chart{height:270px}
 .stats{grid-template-columns:repeat(2,1fr)}
 }
+
+.candle-up{
+  stroke:#62d66f;
+  fill:#62d66f;
+}
+
+.candle-down{
+  stroke:#ff7272;
+  fill:#ff7272;
+}
+
+.chart-range{
+  display:flex;
+  gap:6px;
+  margin-top:22px;
+}
+
+.chart-range button{
+  border:1px solid #30343b;
+  background:#1b1e23;
+  color:#aaa;
+  border-radius:8px;
+  padding:6px 11px;
+  cursor:pointer;
+  font-size:12px;
+}
+
+.chart-range button.active{
+  color:#fff;
+  background:#292d34;
+}
+
 </style>
 </head>
 
@@ -92,6 +124,13 @@ body{margin:0;background:#0d0e10}
 <div class="stat-label">Change</div>
 <div class="stat-value" id="change">—</div>
 </div>
+</div>
+
+<div class="chart-range">
+<button data-range="60">1H</button>
+<button data-range="360">6H</button>
+<button data-range="720">12H</button>
+<button data-range="1440" class="active">24H</button>
 </div>
 
 <div class="chart" id="chart">
@@ -149,127 +188,231 @@ function changeText(v){
   return '0';
 }
 
+
+let chartRangeMinutes = 1440;
+
+function makeCandles(points){
+  const buckets = {};
+
+  for(const p of points){
+    const bucket = Math.floor(p.t / 300000) * 300000;
+
+    if(!buckets[bucket]){
+      buckets[bucket] = {
+        t: bucket,
+        open: p.count,
+        high: p.count,
+        low: p.count,
+        close: p.count
+      };
+    }else{
+      buckets[bucket].high = Math.max(
+        buckets[bucket].high,
+        p.count
+      );
+
+      buckets[bucket].low = Math.min(
+        buckets[bucket].low,
+        p.count
+      );
+
+      buckets[bucket].close = p.count;
+    }
+  }
+
+  return Object.values(buckets).sort((a,b)=>a.t-b.t);
+}
+
 function draw(points){
 
-  const box = $('#chart');
+  const box=$('#chart');
 
   if(!points.length){
-    box.innerHTML = '<div class="empty">No snapshots yet.</div>';
+    box.innerHTML='<div class="empty">No snapshots yet.</div>';
     return;
   }
 
-  const w = box.clientWidth || 900;
-  const h = box.clientHeight || 340;
-  const pad = {l:8,r:78,t:20,b:28};
+  const cutoff=Date.now()-chartRangeMinutes*60000;
 
-  const xs = points.map(p => p.t);
-  const ys = points.map(p => p.count);
+  let visible=points.filter(p=>p.t>=cutoff);
 
-  const minX = xs[0];
-  const maxX = xs[xs.length-1] || minX + 1;
+  if(visible.length<2){
+    visible=points.slice(-2);
+  }
 
-  const dataMin = Math.min(...ys);
-  const dataMax = Math.max(...ys);
+  const candles=makeCandles(visible);
 
-  const padding = Math.max(
+  if(!candles.length){
+    box.innerHTML='<div class="empty">No snapshots yet.</div>';
+    return;
+  }
+
+  const w=box.clientWidth||900;
+  const h=box.clientHeight||340;
+  const pad={l:8,r:78,t:20,b:32};
+
+  const values=[];
+
+  candles.forEach(c=>{
+    values.push(c.high,c.low);
+  });
+
+  const dataMin=Math.min(...values);
+  const dataMax=Math.max(...values);
+  const dataRange=Math.max(1,dataMax-dataMin);
+
+  const padding=Math.max(
     100,
-    Math.round((dataMax-dataMin)*0.12)
+    Math.round(dataRange*.12)
   );
 
-  const minY = Math.floor((dataMin-padding)/100)*100;
-  const maxY = Math.ceil((dataMax+padding)/100)*100;
+  const minY=Math.floor(
+    (dataMin-padding)/100
+  )*100;
 
-  const rangeX = Math.max(1,maxX-minX);
-  const rangeY = Math.max(1,maxY-minY);
+  const maxY=Math.ceil(
+    (dataMax+padding)/100
+  )*100;
 
-  const X = t =>
-    pad.l + ((t-minX)/rangeX)*(w-pad.l-pad.r);
+  const rangeY=Math.max(1,maxY-minY);
 
-  const Y = v =>
-    h-pad.b-((v-minY)/rangeY)*(h-pad.t-pad.b);
+  const first=candles[0].t;
+  const last=candles[candles.length-1].t;
+  const rangeX=Math.max(300000,last-first);
 
-  const line = points.map((p,i) =>
-    (i ? 'L' : 'M') +
-    X(p.t).toFixed(1) + ' ' +
-    Y(p.count).toFixed(1)
-  ).join(' ');
+  const X=t=>
+    pad.l+
+    ((t-first)/rangeX)*
+    (w-pad.l-pad.r);
 
-  const area =
-    line +
-    ` L ${X(maxX).toFixed(1)} ${h-pad.b}` +
-    ` L ${X(minX).toFixed(1)} ${h-pad.b} Z`;
+  const Y=v=>
+    h-pad.b-
+    ((v-minY)/rangeY)*
+    (h-pad.t-pad.b);
 
-  const rawStep = rangeY / 5;
-  const magnitude =
-    Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const rawStep=rangeY/5;
+  const magnitude=Math.pow(
+    10,
+    Math.floor(Math.log10(rawStep))
+  );
 
-  const normalized = rawStep / magnitude;
+  const normalized=rawStep/magnitude;
 
   let step;
 
-  if(normalized <= 1) step = magnitude;
-  else if(normalized <= 2) step = 2*magnitude;
-  else if(normalized <= 5) step = 5*magnitude;
-  else step = 10*magnitude;
+  if(normalized<=1) step=magnitude;
+  else if(normalized<=2) step=2*magnitude;
+  else if(normalized<=5) step=5*magnitude;
+  else step=10*magnitude;
 
-  let ticks = [];
+  let grid='';
 
   for(
-    let v = Math.ceil(minY/step)*step;
-    v <= maxY;
-    v += step
+    let v=Math.ceil(minY/step)*step;
+    v<=maxY;
+    v+=step
   ){
-    ticks.push(v);
-  }
+    const y=Y(v);
 
-  let grid = '';
+    grid+=`
+      <line class="axis"
+        x1="${pad.l}" y1="${y}"
+        x2="${w-pad.r}" y2="${y}"/>
 
-  ticks.forEach(v => {
-
-    const y = Y(v);
-
-    grid += `
-      <line
-        class="axis"
-        x1="${pad.l}"
-        y1="${y}"
-        x2="${w-pad.r}"
-        y2="${y}"
-      />
-
-      <text
-        class="chart-label"
-        x="${w-pad.r+8}"
-        y="${y+4}">
+      <text class="chart-label"
+        x="${w-pad.r+8}" y="${y+4}">
         ${fmt(v)}
       </text>
     `;
-  });
+  }
 
-  box.innerHTML = `
+  let labels='';
+
+  const labelMinutes=
+    chartRangeMinutes<=60 ? 10 :
+    chartRangeMinutes<=360 ? 30 :
+    chartRangeMinutes<=720 ? 60 :
+    120;
+
+  const labelStep=labelMinutes*60000;
+  const labelStart=Math.ceil(first/labelStep)*labelStep;
+
+  for(
+    let t=labelStart;
+    t<=last;
+    t+=labelStep
+  ){
+    const x=X(t);
+
+    if(x<pad.l || x>w-pad.r) continue;
+
+    const d=new Date(t);
+
+    const label=
+      String(d.getHours()).padStart(2,'0')+
+      ':'+
+      String(d.getMinutes()).padStart(2,'0');
+
+    labels+=`
+      <line class="axis"
+        x1="${x}" y1="${h-pad.b}"
+        x2="${x}" y2="${h-pad.b+5}"/>
+
+      <text class="chart-label"
+        text-anchor="middle"
+        x="${x}" y="${h-10}">
+        ${label}
+      </text>
+    `;
+  }
+
+  const candleWidth=Math.max(
+    2,
+    Math.min(
+      14,
+      ((w-pad.l-pad.r)/
+        Math.max(1,candles.length))*0.65
+    )
+  );
+
+  let candleSvg='';
+
+  for(const c of candles){
+
+    const x=X(c.t+150000);
+
+    const openY=Y(c.open);
+    const closeY=Y(c.close);
+    const highY=Y(c.high);
+    const lowY=Y(c.low);
+
+    const up=c.close>=c.open;
+    const cls=up?'candle-up':'candle-down';
+
+    const top=Math.min(openY,closeY);
+    const bodyHeight=Math.max(
+      1,
+      Math.abs(closeY-openY)
+    );
+
+    candleSvg+=`
+      <line class="${cls}"
+        x1="${x}" y1="${highY}"
+        x2="${x}" y2="${lowY}"/>
+
+      <rect class="${cls}"
+        x="${x-candleWidth/2}"
+        y="${top}"
+        width="${candleWidth}"
+        height="${bodyHeight}"/>
+    `;
+  }
+
+  box.innerHTML=`
     <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-
-      <defs>
-        <linearGradient id="fade"
-          x1="0" y1="0"
-          x2="0" y2="1">
-          <stop offset="0" stop-opacity=".14"/>
-          <stop offset="1" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-
       ${grid}
-
-      <path
-        class="area"
-        d="${area}"
-      />
-
-      <path
-        class="line"
-        d="${line}"
-      />
-
+      ${labels}
+      ${candleSvg}
     </svg>
   `;
 }
@@ -313,6 +456,7 @@ async function load(){
     const r=await fetch('/api/history?x='+Date.now());
     const d=await r.json();
     const points=d.points||[];
+    window.__points=points;
 
     if(d.latest){
 
@@ -352,6 +496,23 @@ async function load(){
 
   }
 }
+
+
+document
+  .querySelectorAll('.chart-range button')
+  .forEach(button=>{
+    button.addEventListener('click',()=>{
+      chartRangeMinutes=Number(button.dataset.range);
+
+      document
+        .querySelectorAll('.chart-range button')
+        .forEach(b=>b.classList.remove('active'));
+
+      button.classList.add('active');
+
+      draw(window.__points||[]);
+    });
+  });
 
 $('#refresh').onclick=load;
 
