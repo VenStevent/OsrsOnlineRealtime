@@ -48,17 +48,6 @@ body{margin:0;background:#0d0e10}
 .chart{height:270px}
 .stats{grid-template-columns:repeat(2,1fr)}
 }
-
-.candle-up{
-  stroke:#62d66f;
-  fill:#62d66f;
-}
-
-.candle-down{
-  stroke:#ff7272;
-  fill:#ff7272;
-}
-
 .chart-range{
   display:flex;
   gap:6px;
@@ -240,30 +229,22 @@ function draw(points){
     visible=points.slice(-2);
   }
 
-  const candles=makeCandles(visible);
-
-  if(!candles.length){
-    box.innerHTML='<div class="empty">No snapshots yet.</div>';
-    return;
-  }
-
   const w=box.clientWidth||900;
   const h=box.clientHeight||340;
   const pad={l:8,r:78,t:20,b:32};
 
-  const values=[];
+  const xs=visible.map(p=>p.t);
+  const ys=visible.map(p=>p.count);
 
-  candles.forEach(c=>{
-    values.push(c.high,c.low);
-  });
+  const minX=xs[0];
+  const maxX=xs[xs.length-1]||minX+1;
 
-  const dataMin=Math.min(...values);
-  const dataMax=Math.max(...values);
-  const dataRange=Math.max(1,dataMax-dataMin);
+  const dataMin=Math.min(...ys);
+  const dataMax=Math.max(...ys);
 
   const padding=Math.max(
     100,
-    Math.round(dataRange*.12)
+    Math.round((dataMax-dataMin)*.12)
   );
 
   const minY=Math.floor(
@@ -274,15 +255,12 @@ function draw(points){
     (dataMax+padding)/100
   )*100;
 
+  const rangeX=Math.max(1,maxX-minX);
   const rangeY=Math.max(1,maxY-minY);
-
-  const first=candles[0].t;
-  const last=candles[candles.length-1].t;
-  const rangeX=Math.max(300000,last-first);
 
   const X=t=>
     pad.l+
-    ((t-first)/rangeX)*
+    ((t-minX)/rangeX)*
     (w-pad.l-pad.r);
 
   const Y=v=>
@@ -290,7 +268,19 @@ function draw(points){
     ((v-minY)/rangeY)*
     (h-pad.t-pad.b);
 
+  const line=visible.map((p,i)=>
+    (i?'L':'M')+
+    X(p.t).toFixed(1)+' '+
+    Y(p.count).toFixed(1)
+  ).join(' ');
+
+  const area=
+    line+
+    ` L ${X(maxX).toFixed(1)} ${h-pad.b}`+
+    ` L ${X(minX).toFixed(1)} ${h-pad.b} Z`;
+
   const rawStep=rangeY/5;
+
   const magnitude=Math.pow(
     10,
     Math.floor(Math.log10(rawStep))
@@ -312,15 +302,22 @@ function draw(points){
     v<=maxY;
     v+=step
   ){
+
     const y=Y(v);
 
     grid+=`
-      <line class="axis"
-        x1="${pad.l}" y1="${y}"
-        x2="${w-pad.r}" y2="${y}"/>
+      <line
+        class="axis"
+        x1="${pad.l}"
+        y1="${y}"
+        x2="${w-pad.r}"
+        y2="${y}"
+      />
 
-      <text class="chart-label"
-        x="${w-pad.r+8}" y="${y+4}">
+      <text
+        class="chart-label"
+        x="${w-pad.r+8}"
+        y="${y+4}">
         ${fmt(v)}
       </text>
     `;
@@ -335,16 +332,20 @@ function draw(points){
     120;
 
   const labelStep=labelMinutes*60000;
-  const labelStart=Math.ceil(first/labelStep)*labelStep;
+
+  const firstLabel=
+    Math.ceil(minX/labelStep)*labelStep;
 
   for(
-    let t=labelStart;
-    t<=last;
+    let t=firstLabel;
+    t<=maxX;
     t+=labelStep
   ){
+
     const x=X(t);
 
-    if(x<pad.l || x>w-pad.r) continue;
+    if(x<pad.l || x>w-pad.r)
+      continue;
 
     const d=new Date(t);
 
@@ -354,65 +355,60 @@ function draw(points){
       String(d.getMinutes()).padStart(2,'0');
 
     labels+=`
-      <line class="axis"
-        x1="${x}" y1="${h-pad.b}"
-        x2="${x}" y2="${h-pad.b+5}"/>
+      <line
+        class="axis"
+        x1="${x}"
+        y1="${h-pad.b}"
+        x2="${x}"
+        y2="${h-pad.b+5}"
+      />
 
-      <text class="chart-label"
+      <text
+        class="chart-label"
         text-anchor="middle"
-        x="${x}" y="${h-10}">
+        x="${x}"
+        y="${h-10}">
         ${label}
       </text>
     `;
   }
 
-  const candleWidth=Math.max(
-    2,
-    Math.min(
-      14,
-      ((w-pad.l-pad.r)/
-        Math.max(1,candles.length))*0.65
-    )
-  );
-
-  let candleSvg='';
-
-  for(const c of candles){
-
-    const x=X(c.t+150000);
-
-    const openY=Y(c.open);
-    const closeY=Y(c.close);
-    const highY=Y(c.high);
-    const lowY=Y(c.low);
-
-    const up=c.close>=c.open;
-    const cls=up?'candle-up':'candle-down';
-
-    const top=Math.min(openY,closeY);
-    const bodyHeight=Math.max(
-      1,
-      Math.abs(closeY-openY)
-    );
-
-    candleSvg+=`
-      <line class="${cls}"
-        x1="${x}" y1="${highY}"
-        x2="${x}" y2="${lowY}"/>
-
-      <rect class="${cls}"
-        x="${x-candleWidth/2}"
-        y="${top}"
-        width="${candleWidth}"
-        height="${bodyHeight}"/>
-    `;
-  }
-
   box.innerHTML=`
-    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <svg
+      viewBox="0 0 ${w} ${h}"
+      preserveAspectRatio="none">
+
+      <defs>
+        <linearGradient
+          id="fade"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="1">
+
+          <stop
+            offset="0"
+            stop-opacity=".14"/>
+
+          <stop
+            offset="1"
+            stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+
       ${grid}
       ${labels}
-      ${candleSvg}
+
+      <path
+        class="area"
+        d="${area}"
+      />
+
+      <path
+        class="line"
+        d="${line}"
+      />
+
     </svg>
   `;
 }
