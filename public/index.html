@@ -5,37 +5,322 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OSRS Player Count</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#0d0e10;color:#f1f1f1}*{box-sizing:border-box}body{margin:0;background:#0d0e10}.wrap{max-width:980px;margin:auto;padding:32px 18px 50px}.top{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:22px}.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8e9299}.title{font-size:34px;font-weight:750;margin:6px 0}.sub{color:#8e9299;font-size:14px}.card{background:#15171b;border:1px solid #282b31;border-radius:18px;padding:22px}.number{font-size:58px;line-height:1;font-weight:800;letter-spacing:-.04em}.live{display:inline-flex;align-items:center;gap:7px;margin-top:10px;color:#aeb3bb;font-size:13px}.dot{width:8px;height:8px;border-radius:50%;background:#62d66f}.meta{display:flex;justify-content:space-between;margin-top:20px;color:#777d86;font-size:12px}.chart{height:340px;margin-top:18px;position:relative}.chart svg{width:100%;height:100%;overflow:visible}.axis{stroke:#2b2e34;stroke-width:1}.line{fill:none;stroke:#f0f0f0;stroke-width:2.5}.area{fill:url(#fade);stroke:none}.point{fill:#f0f0f0}.empty{height:100%;display:grid;place-items:center;color:#70757d;font-size:14px;text-align:center}.foot{margin-top:14px;color:#626771;font-size:12px}.btn{border:1px solid #30343b;background:#1b1e23;color:#ddd;border-radius:10px;padding:9px 12px;cursor:pointer}.btn:hover{background:#23272d}@media(max-width:600px){.number{font-size:44px}.top{display:block}.chart{height:270px}}
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#0d0e10;color:#f1f1f1}
+*{box-sizing:border-box}
+body{margin:0;background:#0d0e10}
+.wrap{max-width:980px;margin:auto;padding:32px 18px 50px}
+.top{display:flex;justify-content:space-between;align-items:end;gap:20px;margin-bottom:22px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8e9299}
+.title{font-size:34px;font-weight:750;margin:6px 0}
+.sub{color:#8e9299;font-size:14px}
+.card{background:#15171b;border:1px solid #282b31;border-radius:18px;padding:22px}
+.number{font-size:58px;line-height:1;font-weight:800;letter-spacing:-.04em}
+.live{display:inline-flex;align-items:center;gap:7px;margin-top:10px;color:#aeb3bb;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:#62d66f}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:20px}
+.stat{background:#1b1e23;border:1px solid #292d34;border-radius:12px;padding:12px}
+.stat-label{font-size:11px;color:#777d86;text-transform:uppercase;letter-spacing:.08em}
+.stat-value{font-size:19px;font-weight:700;margin-top:5px}
+.change-up{color:#62d66f}
+.change-down{color:#ff7272}
+.change-flat{color:#aeb3bb}
+.chart{height:340px;margin-top:22px;position:relative}
+.chart svg{width:100%;height:100%;overflow:visible}
+.axis{stroke:#2b2e34;stroke-width:1}
+.line{fill:none;stroke:#f0f0f0;stroke-width:2.5}
+.area{fill:url(#fade);stroke:none}
+.point{fill:#f0f0f0}
+.chart-label{fill:#8e9299;font-size:11px}
+.empty{height:100%;display:grid;place-items:center;color:#70757d;font-size:14px;text-align:center}
+.history{margin-top:22px;border:1px solid #282b31;border-radius:14px;overflow:hidden}
+.history-title{padding:14px 16px;background:#1b1e23;font-size:13px;font-weight:700}
+.history-scroll{max-height:320px;overflow-y:auto}
+.history-row{display:grid;grid-template-columns:1fr 1fr 1fr;padding:9px 16px;border-top:1px solid #22252a;font-size:13px}
+.history-head{color:#777d86;font-size:11px;text-transform:uppercase;letter-spacing:.06em;background:#181a1e}
+.history-row span:nth-child(2){text-align:right}
+.history-row span:nth-child(3){text-align:right}
+.foot{margin-top:14px;color:#626771;font-size:12px}
+.btn{border:1px solid #30343b;background:#1b1e23;color:#ddd;border-radius:10px;padding:9px 12px;cursor:pointer}
+.btn:hover{background:#23272d}
+@media(max-width:600px){
+.number{font-size:44px}
+.top{display:block}
+.chart{height:270px}
+.stats{grid-template-columns:repeat(2,1fr)}
+}
 </style>
 </head>
+
 <body>
 <div class="wrap">
-  <div class="top">
-    <div><div class="eyebrow">Old School RuneScape</div><div class="title">Players Online</div><div class="sub">24-hour population history</div></div>
-    <button class="btn" id="refresh">Refresh</button>
-  </div>
-  <section class="card">
-    <div class="number" id="count">—</div>
-    <div class="live"><span class="dot"></span><span id="status">Waiting for data</span></div>
-    <div class="chart" id="chart"><div class="empty">No snapshots yet.<br>Run the collector once after deployment.</div></div>
-    <div class="meta"><span>24h ago</span><span>Now</span></div>
-  </section>
-  <div class="foot">Source: Old School RuneScape homepage. History is sampled by the collector.</div>
+
+<div class="top">
+<div>
+<div class="eyebrow">Old School RuneScape</div>
+<div class="title">Players Online</div>
+<div class="sub">24-hour population history</div>
 </div>
+<button class="btn" id="refresh">Refresh</button>
+</div>
+
+<section class="card">
+
+<div class="number" id="count">—</div>
+
+<div class="live">
+<span class="dot"></span>
+<span id="status">Waiting for data</span>
+</div>
+
+<div class="stats">
+<div class="stat">
+<div class="stat-label">24h High</div>
+<div class="stat-value" id="high">—</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">24h Low</div>
+<div class="stat-value" id="low">—</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">24h Range</div>
+<div class="stat-value" id="range">—</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">Change</div>
+<div class="stat-value" id="change">—</div>
+</div>
+</div>
+
+<div class="chart" id="chart">
+<div class="empty">No snapshots yet.</div>
+</div>
+
+<div class="history">
+<div class="history-title">Minute History</div>
+
+<div class="history-row history-head">
+<span>Time</span>
+<span>Players</span>
+<span>Change</span>
+</div>
+
+<div class="history-scroll" id="history"></div>
+</div>
+
+</section>
+
+<div class="foot">
+Source: Old School RuneScape homepage. History is sampled by the collector.
+</div>
+
+</div>
+
 <script>
 const $=s=>document.querySelector(s);
-function fmt(n){return new Intl.NumberFormat('en-US').format(n)}
-function timeAgo(ts){const m=Math.max(0,Math.round((Date.now()-ts)/60000));return m<1?'just now':`${m}m ago`}
-function draw(points){const box=$('#chart'); if(!points.length){box.innerHTML='<div class="empty">No snapshots yet.<br>Run the collector once after deployment.</div>';return}
- const w=box.clientWidth||900,h=box.clientHeight||340,pad={l:8,r:8,t:12,b:16};
- const xs=points.map(p=>p.t), ys=points.map(p=>p.count), minX=xs[0],maxX=xs[xs.length-1]||minX+1,minY=Math.min(...ys),maxY=Math.max(...ys); const rangeY=Math.max(1,maxY-minY), rangeX=Math.max(1,maxX-minX);
- const X=t=>pad.l+(t-minX)/rangeX*(w-pad.l-pad.r),Y=v=>h-pad.b-(v-minY)/rangeY*(h-pad.t-pad.b);
- const line=points.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p.count).toFixed(1)).join(' ');
- const area=line+' L '+X(maxX).toFixed(1)+' '+(h-pad.b)+' L '+X(minX).toFixed(1)+' '+(h-pad.b)+' Z';
- const mid=(minY+maxY)/2;
- box.innerHTML=`<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity=".16"/><stop offset="1" stop-opacity="0"/></linearGradient></defs><line class="axis" x1="0" y1="${Y(minY)}" x2="${w}" y2="${Y(minY)}"/><line class="axis" x1="0" y1="${Y(mid)}" x2="${w}" y2="${Y(mid)}"/><path class="area" d="${area}"/><path class="line" d="${line}"/>${points.length<300?points.map(p=>`<circle class="point" cx="${X(p.t)}" cy="${Y(p.count)}" r="2"/>`).join(''):''}</svg>`;
+
+function fmt(n){
+  return new Intl.NumberFormat('en-US').format(n);
 }
-async function load(){try{const r=await fetch('/api/history?x='+Date.now());const d=await r.json();if(d.latest){$('#count').textContent=fmt(d.latest.count);$('#status').textContent=`Updated ${timeAgo(d.latest.t)}`;}draw(d.points||[])}catch(e){$('#status').textContent='Failed to load data'}}
-$('#refresh').onclick=load;load();setInterval(load,60000);window.addEventListener('resize',load);
+
+function time(ts){
+  return new Date(ts).toLocaleTimeString([],{
+    hour:'2-digit',
+    minute:'2-digit'
+  });
+}
+
+function timeAgo(ts){
+  const m=Math.max(0,Math.round((Date.now()-ts)/60000));
+  return m<1?'just now':`${m}m ago`;
+}
+
+function changeClass(v){
+  if(v>0)return 'change-up';
+  if(v<0)return 'change-down';
+  return 'change-flat';
+}
+
+function changeText(v){
+  if(v>0)return '+'+fmt(v);
+  if(v<0)return fmt(v);
+  return '0';
+}
+
+function draw(points){
+
+  const box=$('#chart');
+
+  if(!points.length){
+    box.innerHTML='<div class="empty">No snapshots yet.</div>';
+    return;
+  }
+
+  const w=box.clientWidth||900;
+  const h=box.clientHeight||340;
+  const pad={l:8,r:8,t:25,b:28};
+
+  const xs=points.map(p=>p.t);
+  const ys=points.map(p=>p.count);
+
+  const minX=xs[0];
+  const maxX=xs[xs.length-1]||minX+1;
+  const minY=Math.min(...ys);
+  const maxY=Math.max(...ys);
+
+  const rangeY=Math.max(1,maxY-minY);
+  const rangeX=Math.max(1,maxX-minX);
+
+  const X=t=>pad.l+(t-minX)/rangeX*(w-pad.l-pad.r);
+  const Y=v=>h-pad.b-(v-minY)/rangeY*(h-pad.t-pad.b);
+
+  const line=points.map((p,i)=>
+    (i?'L':'M')+
+    X(p.t).toFixed(1)+' '+
+    Y(p.count).toFixed(1)
+  ).join(' ');
+
+  const area=
+    line+
+    ' L '+X(maxX).toFixed(1)+' '+(h-pad.b)+
+    ' L '+X(minX).toFixed(1)+' '+(h-pad.b)+' Z';
+
+  const mid=(minY+maxY)/2;
+
+  box.innerHTML=`
+  <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+
+  <defs>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-opacity=".16"/>
+      <stop offset="1" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <line class="axis"
+    x1="0" y1="${Y(minY)}"
+    x2="${w}" y2="${Y(minY)}"/>
+
+  <line class="axis"
+    x1="0" y1="${Y(mid)}"
+    x2="${w}" y2="${Y(mid)}"/>
+
+  <path class="area" d="${area}"/>
+  <path class="line" d="${line}"/>
+
+  <text class="chart-label"
+    x="8" y="${Y(maxY)-8}">
+    High ${fmt(maxY)}
+  </text>
+
+  <text class="chart-label"
+    x="8" y="${Y(minY)-8}">
+    Low ${fmt(minY)}
+  </text>
+
+  ${
+    points.length<300
+    ?points.map(p=>
+      `<circle class="point"
+        cx="${X(p.t)}"
+        cy="${Y(p.count)}"
+        r="2"/>`
+    ).join('')
+    :''
+  }
+
+  </svg>`;
+}
+
+function renderHistory(points){
+
+  const history=$('#history');
+
+  if(!points.length){
+    history.innerHTML='';
+    return;
+  }
+
+  let html='';
+
+  for(let i=points.length-1;i>=0;i--){
+
+    const p=points[i];
+
+    let diff=0;
+
+    if(i>0){
+      diff=p.count-points[i-1].count;
+    }
+
+    html+=`
+    <div class="history-row">
+      <span>${time(p.t)}</span>
+      <span>${fmt(p.count)}</span>
+      <span class="${changeClass(diff)}">${changeText(diff)}</span>
+    </div>`;
+  }
+
+  history.innerHTML=html;
+}
+
+async function load(){
+
+  try{
+
+    const r=await fetch('/api/history?x='+Date.now());
+    const d=await r.json();
+    const points=d.points||[];
+
+    if(d.latest){
+
+      const latest=d.latest;
+
+      $('#count').textContent=fmt(latest.count);
+      $('#status').textContent=`Updated ${timeAgo(latest.t)}`;
+
+      const values=points.map(p=>p.count);
+
+      const high=Math.max(...values);
+      const low=Math.min(...values);
+      const range=high-low;
+
+      let change=0;
+
+      if(points.length>=2){
+        change=points[points.length-1].count-
+               points[points.length-2].count;
+      }
+
+      $('#high').textContent=fmt(high);
+      $('#low').textContent=fmt(low);
+      $('#range').textContent=fmt(range);
+
+      const changeEl=$('#change');
+      changeEl.textContent=changeText(change);
+      changeEl.className='stat-value '+changeClass(change);
+    }
+
+    draw(points);
+    renderHistory(points);
+
+  }catch(e){
+
+    $('#status').textContent='Failed to load data';
+
+  }
+}
+
+$('#refresh').onclick=load;
+
+load();
+
+setInterval(load,60000);
+
+window.addEventListener('resize',load);
 </script>
-</body></html>
+
+</body>
+</html>
