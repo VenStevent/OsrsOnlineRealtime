@@ -151,87 +151,127 @@ function changeText(v){
 
 function draw(points){
 
-  const box=$('#chart');
+  const box = $('#chart');
 
   if(!points.length){
-    box.innerHTML='<div class="empty">No snapshots yet.</div>';
+    box.innerHTML = '<div class="empty">No snapshots yet.</div>';
     return;
   }
 
-  const w=box.clientWidth||900;
-  const h=box.clientHeight||340;
-  const pad={l:8,r:8,t:25,b:28};
+  const w = box.clientWidth || 900;
+  const h = box.clientHeight || 340;
+  const pad = {l:8,r:78,t:20,b:28};
 
-  const xs=points.map(p=>p.t);
-  const ys=points.map(p=>p.count);
+  const xs = points.map(p => p.t);
+  const ys = points.map(p => p.count);
 
-  const minX=xs[0];
-  const maxX=xs[xs.length-1]||minX+1;
-  const minY=Math.min(...ys);
-  const maxY=Math.max(...ys);
+  const minX = xs[0];
+  const maxX = xs[xs.length-1] || minX + 1;
 
-  const rangeY=Math.max(1,maxY-minY);
-  const rangeX=Math.max(1,maxX-minX);
+  const dataMin = Math.min(...ys);
+  const dataMax = Math.max(...ys);
 
-  const X=t=>pad.l+(t-minX)/rangeX*(w-pad.l-pad.r);
-  const Y=v=>h-pad.b-(v-minY)/rangeY*(h-pad.t-pad.b);
+  const padding = Math.max(
+    100,
+    Math.round((dataMax-dataMin)*0.12)
+  );
 
-  const line=points.map((p,i)=>
-    (i?'L':'M')+
-    X(p.t).toFixed(1)+' '+
+  const minY = Math.floor((dataMin-padding)/100)*100;
+  const maxY = Math.ceil((dataMax+padding)/100)*100;
+
+  const rangeX = Math.max(1,maxX-minX);
+  const rangeY = Math.max(1,maxY-minY);
+
+  const X = t =>
+    pad.l + ((t-minX)/rangeX)*(w-pad.l-pad.r);
+
+  const Y = v =>
+    h-pad.b-((v-minY)/rangeY)*(h-pad.t-pad.b);
+
+  const line = points.map((p,i) =>
+    (i ? 'L' : 'M') +
+    X(p.t).toFixed(1) + ' ' +
     Y(p.count).toFixed(1)
   ).join(' ');
 
-  const area=
-    line+
-    ' L '+X(maxX).toFixed(1)+' '+(h-pad.b)+
-    ' L '+X(minX).toFixed(1)+' '+(h-pad.b)+' Z';
+  const area =
+    line +
+    ` L ${X(maxX).toFixed(1)} ${h-pad.b}` +
+    ` L ${X(minX).toFixed(1)} ${h-pad.b} Z`;
 
-  const mid=(minY+maxY)/2;
+  const rawStep = rangeY / 5;
+  const magnitude =
+    Math.pow(10, Math.floor(Math.log10(rawStep)));
 
-  box.innerHTML=`
-  <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+  const normalized = rawStep / magnitude;
 
-  <defs>
-    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-opacity=".16"/>
-      <stop offset="1" stop-opacity="0"/>
-    </linearGradient>
-  </defs>
+  let step;
 
-  <line class="axis"
-    x1="0" y1="${Y(minY)}"
-    x2="${w}" y2="${Y(minY)}"/>
+  if(normalized <= 1) step = magnitude;
+  else if(normalized <= 2) step = 2*magnitude;
+  else if(normalized <= 5) step = 5*magnitude;
+  else step = 10*magnitude;
 
-  <line class="axis"
-    x1="0" y1="${Y(mid)}"
-    x2="${w}" y2="${Y(mid)}"/>
+  let ticks = [];
 
-  <path class="area" d="${area}"/>
-  <path class="line" d="${line}"/>
-
-  <text class="chart-label"
-    x="8" y="${Y(maxY)-8}">
-    High ${fmt(maxY)}
-  </text>
-
-  <text class="chart-label"
-    x="8" y="${Y(minY)-8}">
-    Low ${fmt(minY)}
-  </text>
-
-  ${
-    points.length<300
-    ?points.map(p=>
-      `<circle class="point"
-        cx="${X(p.t)}"
-        cy="${Y(p.count)}"
-        r="2"/>`
-    ).join('')
-    :''
+  for(
+    let v = Math.ceil(minY/step)*step;
+    v <= maxY;
+    v += step
+  ){
+    ticks.push(v);
   }
 
-  </svg>`;
+  let grid = '';
+
+  ticks.forEach(v => {
+
+    const y = Y(v);
+
+    grid += `
+      <line
+        class="axis"
+        x1="${pad.l}"
+        y1="${y}"
+        x2="${w-pad.r}"
+        y2="${y}"
+      />
+
+      <text
+        class="chart-label"
+        x="${w-pad.r+8}"
+        y="${y+4}">
+        ${fmt(v)}
+      </text>
+    `;
+  });
+
+  box.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+
+      <defs>
+        <linearGradient id="fade"
+          x1="0" y1="0"
+          x2="0" y2="1">
+          <stop offset="0" stop-opacity=".14"/>
+          <stop offset="1" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+
+      ${grid}
+
+      <path
+        class="area"
+        d="${area}"
+      />
+
+      <path
+        class="line"
+        d="${line}"
+      />
+
+    </svg>
+  `;
 }
 
 function renderHistory(points){
