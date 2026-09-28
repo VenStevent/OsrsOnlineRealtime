@@ -1,7 +1,7 @@
 import { Redis } from '@upstash/redis';
 
 const redis = Redis.fromEnv();
-const SOURCE = 'https://oldschool.runescape.com/';
+const SOURCE = 'https://oldschool.runescape.com/slu';
 const HISTORY_KEY = 'osrs:history:v1';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     });
     if (!response.ok) throw new Error(`OSRS returned ${response.status}`);
     const html = await response.text();
-    const match = html.match(/([\d,]+)\s*players\s*online/i) || html.match(/([\d,]+)\s*players/i);
+    const match = html.match(/There are currently\s+([\d,]+)\s+people playing/i) || html.match(/([\d,]+)\s*players\s*online/i) || html.match(/([\d,]+)\s*players/i);
     if (!match) throw new Error('Could not find OSRS player count in homepage');
 
     const count = Number(match[1].replace(/,/g, ''));
