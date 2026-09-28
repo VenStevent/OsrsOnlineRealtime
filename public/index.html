@@ -456,8 +456,9 @@ async function load(){
 
     if(d.latest){
 
+      const latest=d.latest;
       window.__latestTimestamp=latest.t;
-$('#count').textContent=fmt(latest.count);
+      $('#count').textContent=fmt(latest.count);
       $('#status').textContent=`Updated ${timeAgo(latest.t)}`;
 
       const values=points.map(p=>p.count);
